@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use lopdf::{Document, Error};
+use lopdf::{content::Operation, Document, Error, ObjectId};
 
 use crate::pdf_font::PdfFont;
 
@@ -8,9 +8,9 @@ pub trait PdfFontReader {
     fn get_all_fonts(&self) -> Result<BTreeSet<PdfFont>, Error>;
 }
 
-const SET_TEXT_FONT: &str = "Tf";
-const SET_TEXT_MATRIX: &str = "Tm";
-const DISPLAY_TEXT_OPS: [&str; 4] = ["Tj", "'", "\"", "TJ"];
+pub const SET_TEXT_FONT: &str = "Tf";
+pub const SET_TEXT_MATRIX: &str = "Tm";
+pub const DISPLAY_TEXT_OPS: [&str; 4] = ["Tj", "'", "\"", "TJ"];
 
 impl PdfFontReader for Document {
     fn get_all_fonts(&self) -> Result<BTreeSet<PdfFont>, Error> {
@@ -29,28 +29,9 @@ impl PdfFontReader for Document {
             let contents = self.get_and_decode_page_content(page_id)?;
             for op in contents.operations {
                 match op.operator.as_str() {
-                    SET_TEXT_MATRIX => match &op.operands[..] {
-                        [a, _b, _c, d, _e, _f] => {
-                            current_font.set_size((a.as_float()?, d.as_float()?));
-                        }
-                        _ => return Err(Error::Syntax(String::from("Invalid Tm operands"))),
-                    },
-                    SET_TEXT_FONT => match &op.operands[..] {
-                        [font, size] => {
-                            current_font.set_base_font(
-                                self.get_page_fonts(page_id)
-                                    .get(font.as_name()?)
-                                    .ok_or(Error::ObjectNotFound)?
-                                    .get(b"BaseFont")?
-                                    .as_name_str()?
-                                    .to_string(),
-                            );
-
-                            let size = size.as_float()?;
-                            current_font.set_size((size, size));
-                        }
-                        _ => return Err(Error::Syntax(String::from("Invalid Tf operands"))),
-                    },
+                    SET_TEXT_MATRIX | SET_TEXT_FONT => {
+                        update_font_from_operation(self, &mut current_font, op, page_id)?
+                    }
                     x if DISPLAY_TEXT_OPS.contains(&x) => {
                         fonts.insert(current_font.clone());
                     }
@@ -60,4 +41,38 @@ impl PdfFontReader for Document {
         }
         Ok(fonts)
     }
+}
+
+pub fn update_font_from_operation(
+    doc: &Document,
+    font: &mut PdfFont,
+    op: Operation,
+    page_id: ObjectId,
+) -> Result<(), Error> {
+    match op.operator.as_str() {
+        SET_TEXT_MATRIX => match &op.operands[..] {
+            [a, _b, _c, d, _e, _f] => {
+                font.set_size((a.as_float()?, d.as_float()?));
+            }
+            _ => return Err(Error::Syntax(String::from("Invalid Tm operands"))),
+        },
+        SET_TEXT_FONT => match &op.operands[..] {
+            [new_font, size] => {
+                font.set_base_font(
+                    doc.get_page_fonts(page_id)
+                        .get(new_font.as_name()?)
+                        .ok_or(Error::ObjectNotFound)?
+                        .get(b"BaseFont")?
+                        .as_name_str()?
+                        .to_string(),
+                );
+
+                let size = size.as_float()?;
+                font.set_size((size, size));
+            }
+            _ => return Err(Error::Syntax(String::from("Invalid Tf operands"))),
+        },
+        _ => panic!("update_font_from_operation may only be called with Tf or Tm operators"),
+    }
+    Ok(())
 }

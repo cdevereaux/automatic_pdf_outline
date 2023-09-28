@@ -1,8 +1,9 @@
 use lopdf::{Document, Error};
 
-use crate::font_reader::PdfFontReader;
+use crate::{font_reader::PdfFontReader, generate_outline::print_outline};
 
 mod font_reader;
+mod generate_outline;
 mod pdf_font;
 
 // let outlines_id = doc.add_object(dictionary! {
@@ -24,6 +25,10 @@ fn main() -> Result<(), Error> {
         println!("{}", font);
     }
     println!("{:?}", fonts.len());
+
+    let outline = generate_outline::generate_outline(&doc, &fonts);
+
+    print_outline(outline);
 
     Ok(())
 }
