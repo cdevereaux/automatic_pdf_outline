@@ -69,13 +69,19 @@ pub fn generate_outline(doc: &Document, fonts: &BTreeSet<PdfFont>) -> PdfOutline
 }
 
 fn get_first_instance_on_page(doc: &Document, page_id: ObjectId, font: &PdfFont) -> Option<String> {
+    let mut first_instance = String::default();
     let mut current_font = PdfFont::default();
 
     let contents = doc.get_and_decode_page_content(page_id).ok()?;
     for op in contents.operations {
         match op.operator.as_str() {
             SET_TEXT_MATRIX | SET_TEXT_FONT => {
-                update_font_from_operation(&doc, &mut current_font, op, page_id).ok()?
+                if first_instance.is_empty() {
+                    update_font_from_operation(&doc, &mut current_font, op, page_id).ok()?
+                }
+                else {
+                    return Some(first_instance);
+                }
             }
             x if current_font == *font && DISPLAY_TEXT_OPS.contains(&x) => {
                 if let Some(string_object) = match x {
@@ -84,14 +90,17 @@ fn get_first_instance_on_page(doc: &Document, page_id: ObjectId, font: &PdfFont)
                     "TJ" => op.operands.get(0)?.as_array().ok()?.get(0),
                     _ => unreachable!(),
                 } {
-                    return string_object
-                        .as_string()
-                        .and_then(|s| Ok(s.to_string()))
-                        .ok();
+                    first_instance.push_str(&string_object
+                        .as_string().ok()?.into_owned());
                 }
             }
             _ => (),
         }
     }
-    None
+    if first_instance.is_empty() {
+        None
+    }
+    else {
+        Some(first_instance)
+    }
 }
