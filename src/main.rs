@@ -1,34 +1,33 @@
 use lopdf::{Document, Error};
+use pdf_tools::{
+    pdf_outline::print_outline, PdfFontReader, PdfOutlineGenerator, PdfOutlineInserter,
+};
 
-use crate::{font_reader::PdfFontReader, generate_outline::print_outline};
-
-mod font_reader;
-mod generate_outline;
-mod pdf_font;
-
-// let outlines_id = doc.add_object(dictionary! {
-//     "Type" => "Outlines",
-// });
-
-// let outline_entry_id = doc.add_object(dictionary!(
-//     "Title" => Object::string_literal("MyTitle"),
-//     "Parent" => outlines_id,
-//     "Dest" => vec![page_id.into(), "XYZ".into(), Object::Null, Object::Null, Object::Null,]
-// ));
+mod pdf_tools;
 
 fn main() -> Result<(), Error> {
-    let doc = Document::load("test/abop.pdf")?;
+    let mut doc = Document::load("test/abop.pdf")?;
 
-    let fonts = doc.get_all_fonts().unwrap();
+    let mut fonts = doc.get_all_fonts().unwrap();
 
-    for font in &fonts {
-        println!("{}", font);
+    let mut outline_fonts = vec![];
+    while let Some((font, _count)) = fonts.pop_first() {
+        outline_fonts.push(font);
     }
-    println!("{:?}", fonts.len());
 
-    let outline = generate_outline::generate_outline(&doc, &fonts);
+    let heading_fonts = vec![
+        outline_fonts[0].clone(),
+        outline_fonts[5].clone(),
+        outline_fonts[12].clone(),
+    ];
 
-    print_outline(outline);
+    let outline = doc.generate_outline(&heading_fonts);
+
+    print_outline(&outline);
+
+    doc.insert_outline(&outline)?;
+
+    doc.save("./test/test.pdf")?;
 
     Ok(())
 }

@@ -1,11 +1,11 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lopdf::{content::Operation, Document, Error, ObjectId};
 
-use crate::pdf_font::PdfFont;
+use super::pdf_font::PdfFont;
 
 pub trait PdfFontReader {
-    fn get_all_fonts(&self) -> Result<BTreeSet<PdfFont>, Error>;
+    fn get_all_fonts(&self) -> Result<BTreeMap<PdfFont, usize>, Error>;
 }
 
 pub const SET_TEXT_FONT: &str = "Tf";
@@ -13,9 +13,9 @@ pub const SET_TEXT_MATRIX: &str = "Tm";
 pub const DISPLAY_TEXT_OPS: [&str; 4] = ["Tj", "'", "\"", "TJ"];
 
 impl PdfFontReader for Document {
-    fn get_all_fonts(&self) -> Result<BTreeSet<PdfFont>, Error> {
+    fn get_all_fonts(&self) -> Result<BTreeMap<PdfFont, usize>, Error> {
         let mut base_fonts: BTreeSet<&str> = BTreeSet::new();
-        let mut fonts = BTreeSet::new();
+        let mut fonts = BTreeMap::new();
         for page_id in self.page_iter() {
             //Collect the names of every font on the current page
             for (_font_id, font) in self.get_page_fonts(page_id) {
@@ -33,7 +33,10 @@ impl PdfFontReader for Document {
                         update_font_from_operation(self, &mut current_font, op, page_id)?
                     }
                     x if DISPLAY_TEXT_OPS.contains(&x) => {
-                        fonts.insert(current_font.clone());
+                        fonts
+                            .entry(current_font.clone())
+                            .and_modify(|curr| *curr += 1)
+                            .or_insert(1);
                     }
                     _ => (),
                 }
