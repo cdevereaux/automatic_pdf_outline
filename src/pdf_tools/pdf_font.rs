@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfFont {
-    size: (f32, f32),
-    base_font: String,
+    pub size: (f32, f32),
+    pub base_font: String,
 }
 
 impl PdfFont {

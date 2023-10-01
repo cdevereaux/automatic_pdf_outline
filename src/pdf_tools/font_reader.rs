@@ -24,8 +24,9 @@ impl PdfFontReader for Document {
                 base_fonts.insert(base_font_string);
             }
 
+            //record each font used on page
+            let mut page_fonts = BTreeSet::new();
             let mut current_font = PdfFont::default();
-
             let contents = self.get_and_decode_page_content(page_id)?;
             for op in contents.operations {
                 match op.operator.as_str() {
@@ -33,13 +34,18 @@ impl PdfFontReader for Document {
                         update_font_from_operation(self, &mut current_font, op, page_id)?
                     }
                     x if DISPLAY_TEXT_OPS.contains(&x) => {
-                        fonts
-                            .entry(current_font.clone())
-                            .and_modify(|curr| *curr += 1)
-                            .or_insert(1);
+                        page_fonts.insert(current_font.clone());
                     }
                     _ => (),
                 }
+            }
+
+            //add page fonts to count
+            for font in page_fonts {
+                fonts
+                    .entry(font.clone())
+                    .and_modify(|entry| *entry += 1)
+                    .or_insert(1);
             }
         }
         Ok(fonts)

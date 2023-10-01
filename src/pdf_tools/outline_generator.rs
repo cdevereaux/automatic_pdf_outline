@@ -7,18 +7,19 @@ use super::{
 };
 
 pub trait PdfOutlineGenerator {
-    fn generate_outline(&self, fonts: &[PdfFont]) -> PdfOutline;
+    fn generate_outline(&self, fonts: &Vec<Vec<PdfFont>>) -> PdfOutline;
 }
 
 impl PdfOutlineGenerator for Document {
-    fn generate_outline(&self, fonts: &[PdfFont]) -> PdfOutline {
+    fn generate_outline(&self, heading_fonts: &Vec<Vec<PdfFont>>) -> PdfOutline {
         let mut outline = PdfOutline::new();
         const MAX_DEPTH: usize = 3;
-        for (current_depth, font) in fonts.iter().enumerate() {
+        for (current_depth, fonts) in heading_fonts.iter().enumerate() {
             if current_depth >= MAX_DEPTH {
                 break;
             }
             'page_loop: for (page_number, page_id) in self.get_pages() {
+                for font in fonts.iter() {
                 if let Some(title) = get_first_instance_on_page(self, page_id, font) {
                     let mut parent = &mut outline;
                     for _depth in 0..current_depth {
@@ -35,6 +36,7 @@ impl PdfOutlineGenerator for Document {
 
                     parent.push(PdfOutlineEntry::new(page_number, title));
                 }
+            }
             }
         }
         outline

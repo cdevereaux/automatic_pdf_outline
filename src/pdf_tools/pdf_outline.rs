@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct PdfOutlineEntry {
     pub page_number: u32,
     pub title: String,
