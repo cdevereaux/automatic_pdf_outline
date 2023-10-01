@@ -1,8 +1,15 @@
 use egui::{Color32, DroppedFile, RichText};
 use egui_extras::{Column, TableBuilder};
-use lopdf::Document;
+use lopdf::{Document, Outline};
 
-use crate::{pdf_tools::{pdf_font::PdfFont, PdfFontReader, PdfOutlineGenerator, pdf_outline::PdfOutline, PdfOutlineInserter}, save_file::save_file_from_rust};
+use crate::{
+    pdf_tools::{
+        pdf_font::PdfFont,
+        pdf_outline::{PdfOutline, PdfOutlineEntry},
+        PdfFontReader, PdfOutlineGenerator, PdfOutlineInserter,
+    },
+    save_file::save_file_from_rust,
+};
 
 #[derive(Debug, PartialEq)]
 enum OutlineLevel {
@@ -69,47 +76,53 @@ impl eframe::App for TemplateApp {
         });
 
         egui::TopBottomPanel::bottom("Buttons").show(ctx, |ui| {
-            ui.with_layout(
-                egui::Layout::left_to_right(egui::Align::TOP),
-                |ui| {
-                    let enabled = self.fonts.is_some() && self.heading_fonts.iter().any(|v| !v.is_empty());
-                    ui.add_enabled_ui(enabled, |ui| {
-                        if ui
-                            .button(
-                                RichText::new("Generate Outline")
-                                    .color(Color32::WHITE)
-                                    .heading(),
-                            )
-                            .clicked()
-                        {
-                            let fonts = self.heading_fonts.to_vec();
-                            self.outline = Some(self.doc.as_ref().unwrap().generate_outline(&fonts));
-                        }
-                    });
-                    let enabled = self.outline.is_some();
-                    ui.add_enabled_ui(enabled, |ui| {
-                        if ui
-                            .button(
-                                RichText::new("Save PDF with Outline")
-                                    .heading(),
-                            )
-                            .clicked()
-                        {
-                            let mut new_doc = self.doc.as_ref().unwrap().clone();
-                            //todo: check this
-                            new_doc.insert_outline(&self.outline.as_ref().unwrap()).unwrap();
-                            let mut data = vec![];
-                            //todo: check this
-                            new_doc.save_to(&mut data).unwrap();
-                            save_file_from_rust(data);
-                        }
-                    });
-                },
-            );
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                let enabled =
+                    self.fonts.is_some() && self.heading_fonts.iter().any(|v| !v.is_empty());
+                ui.add_enabled_ui(enabled, |ui| {
+                    if ui
+                        .button(RichText::new("Generate Outline").heading())
+                        .clicked()
+                    {
+                        let fonts = self.heading_fonts.to_vec();
+                        self.outline = Some(self.doc.as_ref().unwrap().generate_outline(&fonts));
+                    }
+                });
+                let enabled = self.outline.is_some();
+                ui.add_enabled_ui(enabled, |ui| {
+                    if ui
+                        .button(RichText::new("Save PDF with Outline").heading())
+                        .clicked()
+                    {
+                        let mut new_doc = self.doc.as_ref().unwrap().clone();
+                        //todo: check this
+                        new_doc
+                            .insert_outline(&self.outline.as_ref().unwrap())
+                            .unwrap();
+                        let mut data = vec![];
+                        //todo: check this
+                        new_doc.save_to(&mut data).unwrap();
+                        save_file_from_rust(data);
+                    }
+                });
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.font_table(ui);
+            ui.horizontal_centered(|ui| {
+                ui.vertical(|ui| {
+                    self.font_table(ui);
+                });
+                ui.vertical(|ui| {
+                    if let Some(outline) = &self.outline {
+                        ui.heading("Outline Preview");
+
+                        egui::ScrollArea::vertical().id_source("Outline Scroll Area").show(ui, |ui| {
+                            self.outline_preview(ui, outline, 0);
+                        });
+                    }
+                });
+            });
         });
     }
 }
@@ -145,56 +158,57 @@ impl TemplateApp {
                         .collect(),
                 );
             }
-        }
-        else {
-        ui.heading("Fonts");
+        } else {
+            ui.heading("Fonts");
 
-        TableBuilder::new(ui)
-            .resizable(true)
-            .striped(true)
-            .column(Column::initial(100.0))
-            .column(Column::initial(125.0))
-            .column(Column::auto().resizable(true))
-            .column(Column::exact(200.0))
-            .header(20.0, |mut header| {
-                header.col(|ui| {
-                    ui.label("Name");
-                });
-                header.col(|ui| {
-                    ui.label("Size");
-                });
-                header.col(|ui| {
-                    ui.label("Page Count");
-                });
-                header.col(|ui| {
-                    ui.label("Outline Level");
-                });
-            })
-            .body(|body| {
-                if let Some(fonts) = &mut self.fonts {
-                    body.rows(20.0, fonts.len(), |index, mut row| {
-                        row.col(|ui| {
-                            ui.add(egui::Label::new(&fonts[index].font.base_font).truncate(true));
-                        });
-                        row.col(|ui| {
-                            let size = fonts[index].font.size;
-                            let size_str = if size.0 == size.1 {
-                                format!("{:?}", fonts[index].font.size.0)
-                            } else {
-                                format!("{:?}", fonts[index].font.size)
-                            };
-                            ui.add(egui::Label::new(size_str).truncate(true));
-                        });
-                        row.col(|ui| {
-                            ui.label(format!("{}", fonts[index].count));
-                        });
-                        row.col(|ui| {
-                            let level = &mut fonts[index].level;
-                            Self::outline_level_buttons(ui, level);
-                        });
+            TableBuilder::new(ui)
+                .resizable(true)
+                .striped(true)
+                .column(Column::initial(100.0))
+                .column(Column::initial(125.0))
+                .column(Column::auto().resizable(true))
+                .column(Column::exact(200.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.label("Name");
                     });
-                }
-            });
+                    header.col(|ui| {
+                        ui.label("Size");
+                    });
+                    header.col(|ui| {
+                        ui.label("Page Count");
+                    });
+                    header.col(|ui| {
+                        ui.label("Outline Level");
+                    });
+                })
+                .body(|body| {
+                    if let Some(fonts) = &mut self.fonts {
+                        body.rows(20.0, fonts.len(), |index, mut row| {
+                            row.col(|ui| {
+                                ui.add(
+                                    egui::Label::new(&fonts[index].font.base_font).truncate(true),
+                                );
+                            });
+                            row.col(|ui| {
+                                let size = fonts[index].font.size;
+                                let size_str = if size.0 == size.1 {
+                                    format!("{:?}", fonts[index].font.size.0)
+                                } else {
+                                    format!("{:?}", fonts[index].font.size)
+                                };
+                                ui.add(egui::Label::new(size_str).truncate(true));
+                            });
+                            row.col(|ui| {
+                                ui.label(format!("{}", fonts[index].count));
+                            });
+                            row.col(|ui| {
+                                let level = &mut fonts[index].level;
+                                Self::outline_level_buttons(ui, level);
+                            });
+                        });
+                    }
+                });
             self.update_heading_fonts();
         }
     }
@@ -234,5 +248,20 @@ impl TemplateApp {
                 }
             }
         });
+    }
+
+    fn outline_preview(&self, ui: &mut egui::Ui, outline: &PdfOutline, mut id: usize) {
+        for entry in outline {
+            ui.push_id(id, |ui| {
+                egui::CollapsingHeader::new(entry.title.clone())
+                    .default_open(true)
+                    .id_source(egui::Id::new(entry.title.clone().push_str(&id.to_string())))
+                    .show(ui, |ui| {
+                        id += 1;
+                        self.outline_preview(ui, &entry.children, id);
+                    });
+            });
+            id += entry.children.len() + 1;
+        }
     }
 }

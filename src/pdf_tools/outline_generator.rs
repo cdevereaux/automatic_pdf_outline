@@ -20,23 +20,23 @@ impl PdfOutlineGenerator for Document {
             }
             'page_loop: for (page_number, page_id) in self.get_pages() {
                 for font in fonts.iter() {
-                if let Some(title) = get_first_instance_on_page(self, page_id, font) {
-                    let mut parent = &mut outline;
-                    for _depth in 0..current_depth {
-                        if let Some(entry) = parent
-                            .iter_mut()
-                            .take_while(|entry| entry.page_number <= page_number)
-                            .last()
-                        {
-                            parent = &mut entry.children;
-                        } else {
-                            continue 'page_loop;
+                    if let Some(title) = get_first_instance_on_page(self, page_id, font) {
+                        let mut parent = &mut outline;
+                        for _depth in 0..current_depth {
+                            if let Some(entry) = parent
+                                .iter_mut()
+                                .take_while(|entry| entry.page_number <= page_number)
+                                .last()
+                            {
+                                parent = &mut entry.children;
+                            } else {
+                                continue 'page_loop;
+                            }
                         }
-                    }
 
-                    parent.push(PdfOutlineEntry::new(page_number, title));
+                        parent.push(PdfOutlineEntry::new(page_number, title));
+                    }
                 }
-            }
             }
         }
         outline
