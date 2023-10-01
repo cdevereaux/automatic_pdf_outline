@@ -7,11 +7,11 @@ use super::{
 };
 
 pub trait PdfOutlineGenerator {
-    fn generate_outline(&self, fonts: &Vec<Vec<PdfFont>>) -> PdfOutline;
+    fn generate_outline(&self, fonts: &[Vec<PdfFont>]) -> PdfOutline;
 }
 
 impl PdfOutlineGenerator for Document {
-    fn generate_outline(&self, heading_fonts: &Vec<Vec<PdfFont>>) -> PdfOutline {
+    fn generate_outline(&self, heading_fonts: &[Vec<PdfFont>]) -> PdfOutline {
         let mut outline = PdfOutline::new();
         const MAX_DEPTH: usize = 3;
         for (current_depth, fonts) in heading_fonts.iter().enumerate() {

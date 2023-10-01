@@ -1,12 +1,11 @@
-use egui::{Color32, DroppedFile, RichText};
+use egui::RichText;
 use egui_extras::{Column, TableBuilder};
-use lopdf::{Document, Outline};
+use lopdf::Document;
 
 use crate::{
     pdf_tools::{
-        pdf_font::PdfFont,
-        pdf_outline::{PdfOutline, PdfOutlineEntry},
-        PdfFontReader, PdfOutlineGenerator, PdfOutlineInserter,
+        pdf_font::PdfFont, pdf_outline::PdfOutline, PdfFontReader, PdfOutlineGenerator,
+        PdfOutlineInserter,
     },
     save_file::save_file_from_rust,
 };
@@ -26,26 +25,13 @@ struct FontRow {
     level: OutlineLevel,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TemplateApp {
     file_name: String,
     fonts: Option<Vec<FontRow>>,
     heading_fonts: [Vec<PdfFont>; 3],
     outline: Option<PdfOutline>,
     doc: Option<Document>,
-}
-
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            // Example stuff:
-            file_name: String::default(),
-            fonts: None,
-            heading_fonts: [vec![], vec![], vec![]],
-            outline: None,
-            doc: None,
-        }
-    }
 }
 
 impl TemplateApp {
@@ -97,7 +83,7 @@ impl eframe::App for TemplateApp {
                         let mut new_doc = self.doc.as_ref().unwrap().clone();
                         //todo: check this
                         new_doc
-                            .insert_outline(&self.outline.as_ref().unwrap())
+                            .insert_outline(self.outline.as_ref().unwrap())
                             .unwrap();
                         let mut data = vec![];
                         //todo: check this
@@ -117,9 +103,11 @@ impl eframe::App for TemplateApp {
                     if let Some(outline) = &self.outline {
                         ui.heading("Outline Preview");
 
-                        egui::ScrollArea::vertical().id_source("Outline Scroll Area").show(ui, |ui| {
-                            self.outline_preview(ui, outline, 0);
-                        });
+                        egui::ScrollArea::vertical()
+                            .id_source("Outline Scroll Area")
+                            .show(ui, |ui| {
+                                Self::outline_preview(ui, outline, 0);
+                            });
                     }
                 });
             });
@@ -133,7 +121,7 @@ impl TemplateApp {
             for file in &input.raw.dropped_files {
                 if file.mime.ends_with("pdf") {
                     if let Some(bytes) = &file.bytes {
-                        if let Ok(doc) = Document::load_mem(&bytes) {
+                        if let Ok(doc) = Document::load_mem(bytes) {
                             self.doc = Some(doc);
                             self.file_name = file.name.clone();
                         }
@@ -250,15 +238,14 @@ impl TemplateApp {
         });
     }
 
-    fn outline_preview(&self, ui: &mut egui::Ui, outline: &PdfOutline, mut id: usize) {
+    fn outline_preview(ui: &mut egui::Ui, outline: &PdfOutline, mut id: usize) {
         for entry in outline {
             ui.push_id(id, |ui| {
                 egui::CollapsingHeader::new(entry.title.clone())
                     .default_open(true)
-                    .id_source(egui::Id::new(entry.title.clone().push_str(&id.to_string())))
                     .show(ui, |ui| {
                         id += 1;
-                        self.outline_preview(ui, &entry.children, id);
+                        Self::outline_preview(ui, &entry.children, id);
                     });
             });
             id += entry.children.len() + 1;
