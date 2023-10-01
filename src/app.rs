@@ -26,7 +26,7 @@ struct FontRow {
 }
 
 #[derive(Debug, Default)]
-pub struct TemplateApp {
+pub struct App {
     file_name: String,
     fonts: Option<Vec<FontRow>>,
     heading_fonts: [Vec<PdfFont>; 3],
@@ -34,7 +34,7 @@ pub struct TemplateApp {
     doc: Option<Document>,
 }
 
-impl TemplateApp {
+impl App {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -44,7 +44,7 @@ impl TemplateApp {
     }
 }
 
-impl eframe::App for TemplateApp {
+impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.doc.is_none() {
@@ -115,7 +115,7 @@ impl eframe::App for TemplateApp {
     }
 }
 
-impl TemplateApp {
+impl App {
     fn check_for_new_pdf_file(&mut self, ctx: &egui::Context) {
         ctx.input(|input| {
             for file in &input.raw.dropped_files {
